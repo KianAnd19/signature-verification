@@ -38,19 +38,16 @@ transform = transforms.Compose([
     transforms.ToTensor()
 ])
 
-training_data = dataset(csv_file='sign_data/train_data.csv', root_dir='sign_data/Dataset/train/', transform=transform)
-train_loader = DataLoader(training_data, batch_size=32, shuffle=True)
 
+def train():
+    # hyperparameters
+    epochs = 10
+    lr = 1e-4
 
+    model = snn().to(device) # siamese neural network
+    training_data = dataset(csv_file='sign_data/train_data.csv', root_dir='sign_data/Dataset/train/', transform=transform)
+    train_loader = DataLoader(training_data, batch_size=32, shuffle=True)
 
-print(training_data[0])
-
-
-
-
-# random_data1 = torch.rand(1, 1, 28, 28).to(device)
-# random_data2 = torch.rand(1, 1, 28, 28).to(device)
-
-# model = snn().to(device)
-# output = model(random_data1, random_data2)
-# print(output)
+    for epoch in range(epochs):
+        print(f"Epoch {epoch+1}")
+    
