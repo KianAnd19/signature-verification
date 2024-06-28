@@ -5,16 +5,14 @@ import torch.nn.functional as F
 class snn(nn.Module):
     def __init__(self) -> None:
         super(snn, self).__init__()
-        
+        self.cnn = cnn()
         self.fc1 = nn.Linear(128, 1)
         
     def forward(self, x, y):
-        cnn1 = cnn()
-        cnn2 = cnn()
-        result1 = cnn1(x)
-        result2 = cnn2(y)
+        result1 = self.cnn(x)
+        result2 = self.cnn(y)
         
-        z = result1 - result2
+        z = torch.abs(result1 - result2) # absolute difference
         
         z = self.fc1(z)
         z = F.sigmoid(z)
@@ -50,11 +48,3 @@ class cnn(nn.Module):
         x = self.pool3(x)
         x = x.view(x.size(0), -1) # flatten the tensor
         return x
-
-
-random_data1 = torch.rand((1, 1, 28, 28))
-random_data2 = torch.rand((1, 1, 28, 28))
-
-my_nn = snn()
-result = my_nn(random_data1, random_data2)
-print(result)
