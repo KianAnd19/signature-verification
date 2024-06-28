@@ -2,6 +2,25 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+class snn(nn.Module):
+    def __init__(self) -> None:
+        super(snn, self).__init__()
+        
+        self.fc1 = nn.Linear(128, 1)
+        
+    def forward(self, x, y):
+        cnn1 = cnn()
+        cnn2 = cnn()
+        result1 = cnn1(x)
+        result2 = cnn2(y)
+        
+        z = result1 - result2
+        
+        z = self.fc1(z)
+        z = F.sigmoid(z)
+        return z
+
+
 class cnn(nn.Module):
     def __init__(self) -> None:
         super(cnn, self).__init__()
@@ -29,12 +48,13 @@ class cnn(nn.Module):
         x = self.conv3(x)
         x = F.relu(x)
         x = self.pool3(x)
-
+        x = x.view(x.size(0), -1) # flatten the tensor
         return x
 
 
-random_data = torch.rand((1, 1, 28, 28))
+random_data1 = torch.rand((1, 1, 28, 28))
+random_data2 = torch.rand((1, 1, 28, 28))
 
-my_nn = cnn()
-result = my_nn(random_data)
-print(result.size())
+my_nn = snn()
+result = my_nn(random_data1, random_data2)
+print(result)
