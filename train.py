@@ -10,7 +10,7 @@ from torch.cuda.amp import GradScaler, autocast
 import time
 from tqdm import tqdm
 from torch.optim.lr_scheduler import StepLR
-
+import sys
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
@@ -123,7 +123,7 @@ def validate(model, criterion, val_loader):
 
 def test(img1, img2):
     model = snn().to(device)
-    # model.load_state_dict(torch.load('model.pth'))
+    model.load_state_dict(torch.load('model.pth'))
     
     img1 = Image.open(img1).convert("L")
     img2 = Image.open(img2).convert("L")
@@ -154,5 +154,10 @@ def test_all():
     print(f"Accuracy: {correct/len(lines):.4f}")
 
 if __name__ == "__main__":
-    # train()
-    test_all()
+    if len(sys.argv) == 2:
+        if sys.argv[1] == 'train':
+            train()
+        elif sys.argv[1] == 'test':
+            test_all()
+    else:
+        print("Usage: python train.py [train|test]")
