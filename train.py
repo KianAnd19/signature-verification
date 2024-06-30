@@ -8,6 +8,7 @@ from PIL import Image
 from torchvision import transforms
 from torch.cuda.amp import GradScaler, autocast
 import time
+from tqdm import tqdm
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
@@ -41,13 +42,16 @@ transform = transforms.Compose([
 
 def train():
     # hyperparameters
-    epochs = 10
-    lr = 1e-3
+    epochs = 50
+    lr = 1e-2
     batch_size = 64  # Increased batch size
 
     training_data = dataset(csv_file='sign_data/train_data.csv', root_dir='sign_data/Dataset/train/', transform=transform)
     train_loader = DataLoader(training_data, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
 
+    val_data = dataset(csv_file='sign_data/test_data.csv', root_dir='sign_data/Dataset/test/', transform=transform)
+    val_loader = DataLoader(val_data, batch_size=64, shuffle=True, num_workers=4, pin_memory=True)
+    
     model = snn().to(device)
     optimizer = torch.optim.Adagrad(model.parameters(), lr=lr)
     criterion = nn.BCEWithLogitsLoss()
@@ -55,13 +59,14 @@ def train():
 
     start_time = time.time()
     
-    print(model.cnn.conv1.weight.grad)
-
+    best_accuracy = 0
 
     for epoch in range(epochs):
+        print('-'*90)
+        print(f"Epoch {epoch+1}:")
         model.train()
         total_loss = 0
-        for i, (img1, img2, label) in enumerate(train_loader):
+        for i, (img1, img2, label) in tqdm(enumerate(train_loader), total=len(train_loader), desc='Training'):
             img1, img2, label = img1.to(device), img2.to(device), label.to(device)
 
             with autocast():
@@ -75,47 +80,39 @@ def train():
 
             total_loss += loss.item()
 
-            if i % 100 == 0:
-                print(f"Epoch {epoch+1}, Batch {i}, Loss: {loss.item():.4f}")
-
         avg_loss = total_loss / len(train_loader)
         print(f"Epoch {epoch+1} completed. Average Loss: {avg_loss:.4f}")
-
+        acc = validate(model, criterion, val_loader)
+        if acc > best_accuracy:
+            best_accuracy = acc
+            torch.save(model.state_dict(), 'best_model.pth')
+        
     end_time = time.time()
-    
-    print(model.cnn.conv1.weight.grad)
-    torch.save(model.state_dict(), 'model.pth')
-    
+    torch.save(model.state_dict(), 'model_last.pth')
     print(f"Training completed in {end_time - start_time:.2f} seconds")
 
-def validate():
-    val_data = dataset(csv_file='sign_data/test_data.csv', root_dir='sign_data/Dataset/test/', transform=transform)
-    val_loader = DataLoader(val_data, batch_size=64, shuffle=True, num_workers=4, pin_memory=True)
-
-    model = snn().to(device)
-    model.load_state_dict(torch.load('model.pth'))
+def validate(model, criterion, val_loader):
     model.eval()
-    criterion = nn.BCEWithLogitsLoss()
     total_loss = 0
+    total_correct = 0
+    total_samples = 0
     
     with torch.no_grad():
-        total_accuracy = 0
-        for i, (img1, img2, label) in enumerate(val_loader):
+        for img1, img2, label in tqdm(val_loader, desc='Validation'):
             img1, img2, label = img1.to(device), img2.to(device), label.to(device)
             output = model(img1, img2)
             loss = criterion(output.squeeze(), label)
             total_loss += loss.item()
 
-            # compute accuracy
+            # Compute accuracy
             pred = torch.sigmoid(output).round()
-            correct = pred.eq(label.view_as(pred)).sum().item()
-            accuracy = correct / len(label)
-            total_accuracy += accuracy
-            
+            total_correct += pred.eq(label.view_as(pred)).sum().item()
+            total_samples += label.size(0)
+
         avg_loss = total_loss / len(val_loader)
-        print(f"Validation Loss: {avg_loss:.4f}")
-        total_accuracy /= len(val_loader)
-        print(f"Validation Accuracy: {total_accuracy:.4f}")
+        accuracy = total_correct / total_samples
+        print(f"Validation Loss: {avg_loss:.4f}, Validation Accuracy: {accuracy:.4f}")
+    return accuracy
+
 if __name__ == "__main__":
-    # train()
-    validate()
+    train()
