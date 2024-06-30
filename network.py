@@ -15,7 +15,7 @@ class snn(nn.Module):
         z = torch.abs(result1 - result2)  # absolute difference
         
         z = self.fc1(z)
-        z = torch.sigmoid(z)
+        # z = torch.sigmoid(z)
         return z
 
 
@@ -37,7 +37,7 @@ class cnn(nn.Module):
 
         self.fc_input_size = self._get_conv_output((1, 200, 200))
         self.fc1 = nn.Linear(self.fc_input_size, 128)
-    
+        
     def _get_conv_output(self, shape):
         # This function calculates the size of the output tensor after the convolutional layers
         with torch.no_grad():
@@ -50,11 +50,11 @@ class cnn(nn.Module):
         x = self.conv1(x)
         x = F.relu(x)
         x = self.pool1(x)
-
+        
         x = self.conv2(x)
         x = F.relu(x)
         x = self.pool2(x)
-
+        
         x = self.conv3(x)
         x = F.relu(x)
         x = self.pool3(x)

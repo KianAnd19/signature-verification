@@ -9,6 +9,8 @@ from torchvision import transforms
 from torch.cuda.amp import GradScaler, autocast
 import time
 from tqdm import tqdm
+from torch.optim.lr_scheduler import StepLR
+
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
@@ -43,7 +45,8 @@ transform = transforms.Compose([
 def train():
     # hyperparameters
     epochs = 50
-    lr = 1e-2
+    lr = 0.002
+    print(f"Learning rate: {lr}")
     batch_size = 64  # Increased batch size
 
     training_data = dataset(csv_file='sign_data/train_data.csv', root_dir='sign_data/Dataset/train/', transform=transform)
@@ -53,10 +56,11 @@ def train():
     val_loader = DataLoader(val_data, batch_size=64, shuffle=True, num_workers=4, pin_memory=True)
     
     model = snn().to(device)
-    optimizer = torch.optim.Adagrad(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    scheduler = StepLR(optimizer, step_size=5, gamma=0.5)
     criterion = nn.BCEWithLogitsLoss()
     scaler = GradScaler()
-
+    
     start_time = time.time()
     
     best_accuracy = 0
@@ -80,13 +84,16 @@ def train():
 
             total_loss += loss.item()
 
+        print('TOTAL LOSS:', total_loss, 'LEN:', len(train_loader))
         avg_loss = total_loss / len(train_loader)
         print(f"Epoch {epoch+1} completed. Average Loss: {avg_loss:.4f}")
         acc = validate(model, criterion, val_loader)
         if acc > best_accuracy:
             best_accuracy = acc
             torch.save(model.state_dict(), 'best_model.pth')
-        
+            
+        scheduler.step()
+            
     end_time = time.time()
     torch.save(model.state_dict(), 'model_last.pth')
     print(f"Training completed in {end_time - start_time:.2f} seconds")
@@ -114,5 +121,38 @@ def validate(model, criterion, val_loader):
         print(f"Validation Loss: {avg_loss:.4f}, Validation Accuracy: {accuracy:.4f}")
     return accuracy
 
+def test(img1, img2):
+    model = snn().to(device)
+    # model.load_state_dict(torch.load('model.pth'))
+    
+    img1 = Image.open(img1).convert("L")
+    img2 = Image.open(img2).convert("L")
+    transform = transforms.Compose([
+        transforms.Resize((200, 200)),
+        transforms.ToTensor()
+    ])
+    
+    img1 = transform(img1).unsqueeze(0).to(device)
+    img2 = transform(img2).unsqueeze(0).to(device)
+    
+    with torch.no_grad():
+        output = model(img1, img2)
+        pred = torch.sigmoid(output).item()
+        return pred
+
+
+def test_all():
+    correct = 0
+    with open('sign_data/test_data.csv', 'r') as f:
+        lines = f.readlines()
+        for line in tqdm(lines):
+            img1, img2, label = line.split(',')
+            result = round((test(f'sign_data/Dataset/test/{img1}', f'sign_data/Dataset/test/{img2}')))
+            if result == int(label):
+                correct += 1
+                
+    print(f"Accuracy: {correct/len(lines):.4f}")
+
 if __name__ == "__main__":
-    train()
+    # train()
+    test_all()
