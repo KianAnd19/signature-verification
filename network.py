@@ -15,7 +15,6 @@ class snn(nn.Module):
         z = torch.abs(result1 - result2)  # absolute difference
         
         z = self.fc1(z)
-        # z = torch.sigmoid(z)
         return z
 
 

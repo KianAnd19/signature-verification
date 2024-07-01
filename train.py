@@ -2,15 +2,17 @@ import torch
 import torch.nn as nn
 import os
 import pandas as pd
+import time
+import sys
+import matplotlib.pyplot as plt
+
+from tqdm import tqdm
+from torch.optim.lr_scheduler import StepLR
 from network import snn
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
 from torchvision import transforms
 from torch.cuda.amp import GradScaler, autocast
-import time
-from tqdm import tqdm
-from torch.optim.lr_scheduler import StepLR
-import sys
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
@@ -44,7 +46,7 @@ transform = transforms.Compose([
 
 def train():
     # hyperparameters
-    epochs = 50
+    epochs = 10
     lr = 0.002
     print(f"Learning rate: {lr}")
     batch_size = 64  # Increased batch size
@@ -64,6 +66,10 @@ def train():
     start_time = time.time()
     
     best_accuracy = 0
+
+    loss_list = []
+    acc_list = []
+
 
     for epoch in range(epochs):
         print('-'*90)
@@ -92,11 +98,17 @@ def train():
             best_accuracy = acc
             torch.save(model.state_dict(), 'best_model.pth')
             
+        loss_list.append(avg_loss)
+        acc_list.append(acc)
+        
         scheduler.step()
             
     end_time = time.time()
     torch.save(model.state_dict(), 'model_last.pth')
     print(f"Training completed in {end_time - start_time:.2f} seconds")
+    
+    plot_metrics(loss_list, acc_list)
+
 
 def validate(model, criterion, val_loader):
     model.eval()
@@ -121,37 +133,38 @@ def validate(model, criterion, val_loader):
         print(f"Validation Loss: {avg_loss:.4f}, Validation Accuracy: {accuracy:.4f}")
     return accuracy
 
-def test(img1, img2):
+def test_all():
+    val_data = dataset(csv_file='sign_data/test_data.csv', root_dir='sign_data/Dataset/test/', transform=transform)
+    val_loader = DataLoader(val_data, batch_size=64, shuffle=True, num_workers=4, pin_memory=True)
+    
     model = snn().to(device)
     model.load_state_dict(torch.load('model.pth'))
+    criterion = nn.BCEWithLogitsLoss()
     
-    img1 = Image.open(img1).convert("L")
-    img2 = Image.open(img2).convert("L")
-    transform = transforms.Compose([
-        transforms.Resize((200, 200)),
-        transforms.ToTensor()
-    ])
-    
-    img1 = transform(img1).unsqueeze(0).to(device)
-    img2 = transform(img2).unsqueeze(0).to(device)
-    
-    with torch.no_grad():
-        output = model(img1, img2)
-        pred = torch.sigmoid(output).item()
-        return pred
+    acc = validate(model, criterion, val_loader)
+    print(f"Accuracy: {acc:.4f}")
 
+def plot_metrics(loss, acc):
+    epochs = range(1, len(loss) + 1)
 
-def test_all():
-    correct = 0
-    with open('sign_data/test_data.csv', 'r') as f:
-        lines = f.readlines()
-        for line in tqdm(lines):
-            img1, img2, label = line.split(',')
-            result = round((test(f'sign_data/Dataset/test/{img1}', f'sign_data/Dataset/test/{img2}')))
-            if result == int(label):
-                correct += 1
-                
-    print(f"Accuracy: {correct/len(lines):.4f}")
+    fig, ax1 = plt.subplots()
+
+    ax1.set_xlabel('Epochs')
+    ax1.set_ylabel('Loss', color='tab:blue')
+    ax1.plot(epochs, loss, label='Training Loss', color='tab:blue')
+    ax1.tick_params(axis='y', labelcolor='tab:blue')
+
+    ax2 = ax1.twinx()
+    ax2.set_ylabel('Accuracy', color='tab:orange')
+    ax2.plot(epochs, acc, label='Validation Accuracy', color='tab:orange')
+    ax2.tick_params(axis='y', labelcolor='tab:orange')
+
+    fig.tight_layout()
+    plt.title('Training Loss and Validation Accuracy over Epochs')
+    fig.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=2)
+    plt.savefig('metrics.png')
+    plt.show()
+
 
 if __name__ == "__main__":
     if len(sys.argv) == 2:

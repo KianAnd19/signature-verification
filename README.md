@@ -11,7 +11,18 @@ This project implements a signature verification system using Siamese Neural Net
 - Learning rate scheduling with StepLR
 - Validation during training
 - Model saving and loading
-- Test functionality for individual image pairs and bulk testing
+- Test functionality for individual image pairs and bulk testing'
+
+The model is able to accurately distinguish between forged and genuine signatures:
+
+**Genuine:**
+
+![image](images/genuine.png) 
+
+
+**Forged:**
+
+![image](images/forged.PNG) 
 
 ## Requirements
 
@@ -34,6 +45,8 @@ This project implements a signature verification system using Siamese Neural Net
     - `test/`: Test images
 
 ## Usage
+
+First download the [dataset](https://www.kaggle.com/datasets/robinreni/signature-verification-dataset) and place it in the project directory.
 
 ### Training the Model
 
@@ -66,6 +79,9 @@ print(f"Similarity score: {result}")
 
 ## Model Architecture
 
+![image](images/architecture.png)
+
+
 The model consists of two main components:
 
 1. A Convolutional Neural Network (CNN) for feature extraction
@@ -84,9 +100,15 @@ The SNN takes the absolute difference between the feature vectors of two images 
 - Epochs: 10
 - Learning rate scheduler: StepLR with step size 5 and gamma 0.5
 
+## Dataset
+
+The [dataset](https://www.kaggle.com/datasets/robinreni/signature-verification-dataset) was aquired from kaggle, it is a restructured version of a dataset from a competition on detecting signature authenticity. It contains genuine and forged signatures of varying degrees, some of the forged signatures are from skilled forgers and the rest are from ordinary people trying to replicate signatures.
+
 ## Performance
 
-The model's performance can be monitored during training through the displayed loss and validation accuracy. After training, you can evaluate the model's overall accuracy on the test set.
+The model was trained for 10 epochs, however the model achieved 100% accuracy on the test set after 3 epochs. (This worked better than I expected)
+
+![image](images/metrics.png)
 
 ## Future Improvements
 
@@ -103,4 +125,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgements
 
 - https://medium.com/analytics-vidhya/siamese-neural-network-for-signature-verification-efd2f399d586(Providing a general overview on the problem, and also the basis of the neural network architecture.)
-- dataset(will get link now)
+- [dataset](https://www.kaggle.com/datasets/robinreni/signature-verification-dataset)
