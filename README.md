@@ -32,21 +32,16 @@ The model is able to accurately distinguish between forged and genuine signature
 - pandas
 - Pillow
 - tqdm
+- kagglehub
 
 ## Project Structure
 
 - `train.py`: Main script for training and testing the model
 - `network.py`: Contains the SNN and CNN model definitions
-- `sign_data/`: Directory containing the dataset
-  - `train_data.csv`: CSV file with training data pairs
-  - `test_data.csv`: CSV file with test data pairs
-  - `Dataset/`: Directory containing the actual signature images
-    - `train/`: Training images
-    - `test/`: Test images
 
 ## Usage
 
-First download the [dataset](https://www.kaggle.com/datasets/robinreni/signature-verification-dataset) and place it in the project directory.
+The dataset should download automatically if kagglehub is installed
 
 ### Training the Model
 
@@ -63,19 +58,25 @@ This will start the training process using the data specified in `sign_data/trai
 To test the model on the entire test set, run:
 
 ```
-python train.py test
+python train.py val 
 ```
 
 This will evaluate the model on all pairs specified in `sign_data/test_data.csv` and print the overall accuracy.
 
 ### Using the Model
 
-To use the trained model for comparing two specific signatures, you can use the `test()` function in `train.py`. Example usage:
+To use the trained model for comparing two specific signatures, you can use the `image_similarity()` function in `train.py` or call it from the command line. Example usage:
+
+```
+python train.py test 'file_path1' 'file_path2'
+```
 
 ```python
-result = test('path/to/image1.jpg', 'path/to/image2.jpg')
+result = image_similarity('path/to/image1.jpg', 'path/to/image2.jpg')
 print(f"Similarity score: {result}")
 ```
+
+**Note: The similarity scores are reverse (1 = Forged, 0 = Genuine)**
 
 ## Model Architecture
 
@@ -98,7 +99,6 @@ The SNN takes the absolute difference between the feature vectors of two images 
 - Learning rate: 0.002
 - Batch size: 64
 - Epochs: 10
-- Learning rate scheduler: StepLR with step size 5 and gamma 0.5
 
 ## Dataset
 

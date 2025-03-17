@@ -5,17 +5,21 @@ import pandas as pd
 import time
 import sys
 import matplotlib.pyplot as plt
+import kagglehub
 
 from tqdm import tqdm
-from torch.optim.lr_scheduler import StepLR
 from network import snn
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
 from torchvision import transforms
-from torch.cuda.amp import GradScaler, autocast
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(f"Using device: {device}")
+device = 'mps'
+#print(f"Using device: {device}")
+
+path = kagglehub.dataset_download("robinreni/signature-verification-dataset")
+#print(f'Path: {path}')
+
 
 class dataset(Dataset):
     def __init__(self, csv_file, root_dir, transform=None):
@@ -40,28 +44,28 @@ class dataset(Dataset):
         return img1, img2, torch.tensor(label, dtype=torch.float32)
 
 transform = transforms.Compose([
-    transforms.Resize((200, 200)),
+    transforms.Resize((32, 32)),
     transforms.ToTensor()
 ])
 
 def train():
     # hyperparameters
-    epochs = 10
+    epochs = 10 
     lr = 0.002
     print(f"Learning rate: {lr}")
-    batch_size = 64  # Increased batch size
+    batch_size = 64 
 
-    training_data = dataset(csv_file='sign_data/train_data.csv', root_dir='sign_data/Dataset/train/', transform=transform)
+    # Datasets
+    training_data = dataset(csv_file=f'{path}/sign_data/train_data.csv', root_dir=f'{path}/sign_data/train/', transform=transform)
+    val_data = dataset(csv_file=f'{path}/sign_data/test_data.csv', root_dir=f'{path}/sign_data/test/', transform=transform)
+
+    # Dataloaders
     train_loader = DataLoader(training_data, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
-
-    val_data = dataset(csv_file='sign_data/test_data.csv', root_dir='sign_data/Dataset/test/', transform=transform)
     val_loader = DataLoader(val_data, batch_size=64, shuffle=True, num_workers=4, pin_memory=True)
     
     model = snn().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    scheduler = StepLR(optimizer, step_size=5, gamma=0.5)
     criterion = nn.BCEWithLogitsLoss()
-    scaler = GradScaler()
     
     start_time = time.time()
     
@@ -69,7 +73,6 @@ def train():
 
     loss_list = []
     acc_list = []
-
 
     for epoch in range(epochs):
         print('-'*90)
@@ -79,20 +82,19 @@ def train():
         for i, (img1, img2, label) in tqdm(enumerate(train_loader), total=len(train_loader), desc='Training'):
             img1, img2, label = img1.to(device), img2.to(device), label.to(device)
 
-            with autocast():
-                output = model(img1, img2)
-                loss = criterion(output.squeeze(), label)
-
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-            optimizer.zero_grad(set_to_none=True)
+            output = model(img1, img2)
+            loss = criterion(output.squeeze(), label)
+            
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
             total_loss += loss.item()
 
         print('TOTAL LOSS:', total_loss, 'LEN:', len(train_loader))
         avg_loss = total_loss / len(train_loader)
         print(f"Epoch {epoch+1} completed. Average Loss: {avg_loss:.4f}")
+
         acc = validate(model, criterion, val_loader)
         if acc > best_accuracy:
             best_accuracy = acc
@@ -101,14 +103,11 @@ def train():
         loss_list.append(avg_loss)
         acc_list.append(acc)
         
-        scheduler.step()
-            
     end_time = time.time()
     torch.save(model.state_dict(), 'model_last.pth')
     print(f"Training completed in {end_time - start_time:.2f} seconds")
     
     plot_metrics(loss_list, acc_list)
-
 
 def validate(model, criterion, val_loader):
     model.eval()
@@ -134,15 +133,33 @@ def validate(model, criterion, val_loader):
     return accuracy
 
 def test_all():
-    val_data = dataset(csv_file='sign_data/test_data.csv', root_dir='sign_data/Dataset/test/', transform=transform)
+    val_data = dataset(csv_file=f'{path}/sign_data/test_data.csv', root_dir=f'{path}/sign_data/test/', transform=transform)
     val_loader = DataLoader(val_data, batch_size=64, shuffle=True, num_workers=4, pin_memory=True)
     
     model = snn().to(device)
-    model.load_state_dict(torch.load('model.pth'))
+    model.load_state_dict(torch.load('model_last.pth', weights_only=True))
     criterion = nn.BCEWithLogitsLoss()
     
     acc = validate(model, criterion, val_loader)
     print(f"Accuracy: {acc:.4f}")
+
+
+def image_similarity(img1_path, img2_path):
+    model = snn().to(device)
+    model.load_state_dict(torch.load('model_last.pth', weights_only=True))
+
+
+    # Preprocess images
+    img1 = transform(Image.open(img1_path).convert("L")).unsqueeze(0).to(device)
+    img2 = transform(Image.open(img2_path).convert("L")).unsqueeze(0).to(device)
+
+    # Get prediction
+    with torch.no_grad():
+        logit = model(img1, img2)
+        similarity = torch.sigmoid(logit).item()  # Convert to probability
+
+    return similarity
+
 
 def plot_metrics(loss, acc):
     epochs = range(1, len(loss) + 1)
@@ -167,10 +184,13 @@ def plot_metrics(loss, acc):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 2:
-        if sys.argv[1] == 'train':
-            train()
-        elif sys.argv[1] == 'test':
-            test_all()
+    if sys.argv[1] == 'train':
+        train()
+    elif sys.argv[1] == 'val':
+        test_all()
+    elif sys.argv[1] == 'test':
+        #similarity = image_similarity('test/test1.png', 'test/test2.png') just easier to test
+        similarity = image_similarity(sys.argv[2], sys.argv[3])
+        print('Genuine' if similarity < 0.5 else 'Forged') # note the similarity is swapped around in the data, (1 means forged, 0 means genuine)
     else:
-        print("Usage: python train.py [train|test]")
+        print("Usage: python train.py [train | val | test]")
