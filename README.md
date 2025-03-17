@@ -106,7 +106,7 @@ The [dataset](https://www.kaggle.com/datasets/robinreni/signature-verification-d
 
 ## Performance
 
-The model was trained for 10 epochs, however the model achieved 100% accuracy on the test set after 3 epochs. (This worked better than I expected)
+The model was trained for 10 epochs, achieving 100% accuracy on the 10th epoch.
 
 ![image](images/metrics.png)
 
